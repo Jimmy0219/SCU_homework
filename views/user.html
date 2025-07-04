@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>判決書檢索系統</title>
+    <link href="/style.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div class="cardLayout">
+        <h1>判決書檢索系統</h1>
+        <form id="advancedSearchForm">
+            <input type="text" id="caseType" placeholder="案件標題"><br><br>
+            <input type="text" id="titleKeyword" placeholder="主文中的關鍵字"><br><br>
+            <input type="text" id="summaryKeyword" placeholder="案件類別"><br><br>
+            <button type="submit" id="advancedSearchBtn">開始搜尋</button>
+        </form>
+        <hr />
+        <button id="refreshButton">查看全部資料</button>
+        <table id="record2">
+            <thead>
+                <tr>
+                    <th>J-ID</th>
+                    <th>標題</th>
+                    <th>日期</th>
+                    <th class="summaryCol">主文</th>
+                    <th>案件類別</th>
+                    <th>案件PDF檔</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+        //渲染表格共用函式
+        function renderTable(dataArray) {
+            const tableBody = document.querySelector("#record2 tbody");
+            tableBody.innerHTML = "";//清空表格避免重疊
+            dataArray.forEach(row => appendRow(tableBody, row));//將一筆筆資料加入表格
+            document.getElementById("record2").style.display = "table";
+        }
+
+        //加入資料列
+        function appendRow(tableBody, rowData) {
+            const displayKeys = ["J-ID", "J-Title", "J-Date", "J-Summary", "Case-Type", "J-PDF"];
+            const row = document.createElement("tr");//照順序建立<tr>元素
+
+            displayKeys.forEach((key) => {
+                const cell = document.createElement("td");//建立<td>元素
+                //如果是PDF欄位，建立下載超連結    
+                if (key === "J-PDF") {
+                    const link = document.createElement("a");//建立<a>超連結元素
+                    link.href = rowData[key];//設定PDF檔案連結
+                    link.download = "";
+                    link.textContent = "下載 PDF";
+                    cell.appendChild(link);//把超連結放進<td>
+                //如果是主文欄位，加上「顯示更多、收合」按鈕控制全文開關
+                } else if (key === "J-Summary") {
+                    cell.classList.add("summaryCol");
+
+                    const fullText = document.createElement("div");
+                    fullText.textContent = rowData[key];//顯示完整主文
+                    fullText.style.display = "none"; //初始不顯示
+                    fullText.style.whiteSpace = "pre-wrap";//保留換行
+
+                    const toggleBtn = document.createElement("button");
+                    toggleBtn.textContent = "顯示更多";
+                    toggleBtn.classList.add("show-btn");//加上按鈕樣式
+                    toggleBtn.onclick = () => {
+                        const isShown = fullText.style.display === "block";
+                        fullText.style.display = isShown ? "none" : "block";//切換顯示狀態
+                        toggleBtn.textContent = isShown ? "顯示更多" : "收合";//切換按鈕文字
+                    };
+                    //把按鈕和主文放進 <td>
+                    cell.appendChild(toggleBtn);
+                    cell.appendChild(fullText);
+                //除了PDF和主文外的欄位直接顯示
+                } else {
+                    cell.textContent = rowData[key];
+                }
+                row.appendChild(cell);//組成列
+            });
+            tableBody.appendChild(row);//將列放入表格
+        }
+
+        //載入所有資料
+        function fetchData() {
+            fetch("/api/users")
+                .then(response => response.json())
+                .then(data => renderTable(data.users))
+                .catch(err => console.error("載入失敗：", err));
+        }
+
+        //進階搜尋
+        document.getElementById("advancedSearchForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+            //取得使用者輸入的內容
+            const caseType = document.getElementById("caseType").value;
+            const titleKeyword = document.getElementById("titleKeyword").value;
+            const summaryKeyword = document.getElementById("summaryKeyword").value;
+            //將內容轉為 URL 查詢參數
+            const params = new URLSearchParams({
+                caseType,
+                titleKeyword,
+                summaryKeyword
+            });
+            //發送GET請求
+            fetch("/api/advanced-search?" + params.toString())
+                .then(response => response.json())
+                .then(data => renderTable(data.users))
+                .catch(err => console.error("搜尋錯誤：", err));
+        });
+
+        //頁面載入後綁定按鈕「查看全部資料」
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById("refreshButton").addEventListener("click", fetchData);
+        });
+    </script>
+</body>
+
+</html>
